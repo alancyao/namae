@@ -2,14 +2,92 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="robots" content="noindex" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-7NNELVueT9d15DcL7HwzP0DJJy0l1bREhOcuTtZdm3A='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' wss://nos.lol wss://relay.primal.net wss://relay.nostr.net wss://nostr-pub.wellorder.net wss://nostr.girino.org wss://relay.mostro.network ws://127.0.0.1:* ws://localhost:*; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Namae</title>
+    <!-- Text from src/copy.ts (common.tagline and welcome.bodyMatches); tests/unit/ui.test.ts keeps the two in step. -->
+    <meta name="description" content="Find a name you both love. You each rate names on your phone. Names you both like become matches." />
+    <!-- A list is private to the couple who made it, and every page is the same shell: nothing here is worth indexing. -->
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#1c1a4a" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Namae" />
+    <!-- Invite links must not leak through the Referer header; the secret is in the fragment, and this covers the rest. -->
+    <meta name="referrer" content="no-referrer" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Namae" />
+    <meta property="og:title" content="Namae" />
+    <meta property="og:description" content="Find a name you both love. You each rate names on your phone. Names you both like become matches." />
+    <!-- Link previews need an absolute address; this is where publish.sh puts the app. -->
+    <meta property="og:url" content="https://www.alanyao.com/namae/" />
+    <meta property="og:image" content="https://www.alanyao.com/namae/art/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="./art/favicon.png" />
+    <link rel="apple-touch-icon" href="./art/apple-touch-icon.png" />
+    <link rel="preload" href="./fonts/nunito-variable-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="./fonts/kiwi-maru-500-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- Night before the stylesheet arrives, so the page never flashes white. -->
     <style>
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #1c1a4a; color: #fff8ec; font: 600 18px system-ui, sans-serif; }
+      html {
+        background: #12103a;
+      }
     </style>
+    <script type="module" crossorigin src="./assets/index-DBtWUkTx.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CzlSYoy4.css">
   </head>
   <body>
-    <p>Namae is on its way.</p>
+    <div id="app"></div>
+    <!-- Shown when the app's own script or stylesheet does not load, which is a first visit with no connection.
+         The text is src/copy.ts errors.offlineFirstRun; tests/unit/ui.test.ts keeps the two in step.
+         Both notes are placed on the screen by themselves (position: fixed). In the flow of the page they sat
+         under #app, which the stylesheet makes as tall as the screen, so with the stylesheet loaded and the
+         script not started they were below the fold of a page that does not scroll: an empty dark screen. -->
+    <p id="boot-note" hidden style="position: fixed; top: 30vh; right: 0; left: 0; margin: 0 auto; max-width: 20em; padding: 0 24px; color: #fff4dc; font: 700 17px/1.4 system-ui, sans-serif; text-align: center">
+      You're offline. Open Namae once online, and it works offline from then on.
+    </p>
+    <!-- Shown when the browser lacks something the app cannot do without (the script below). The text is
+         src/copy.ts errors.unsupportedBrowser; tests/unit/ui.test.ts keeps the two in step. -->
+    <p id="unsupported-note" hidden style="position: fixed; top: 30vh; right: 0; left: 0; margin: 0 auto; max-width: 20em; padding: 0 24px; color: #fff4dc; font: 700 17px/1.4 system-ui, sans-serif; text-align: center">
+      Namae needs a newer browser. Update this one, then open Namae again.
+    </p>
+    <script>
+      // Written for the oldest browsers: no syntax newer than ES5, since this is what has to run where the
+      // app's own script does not. The app needs Object.hasOwn (Safari 15.4, Chrome 93, Firefox 92) and
+      // compression streams with the 'deflate-raw' format (Safari 16.4, Chrome 103, Firefox 113), which sync
+      // packs every update with. The constructors are called because some browsers have the classes without
+      // that format. src/main.tsx does not start the app when window.namaeUnsupported is set.
+      (function () {
+        var supported = typeof Object.hasOwn === 'function' && typeof WebSocket === 'function';
+        try {
+          new CompressionStream('deflate-raw');
+          new DecompressionStream('deflate-raw');
+        } catch (error) {
+          supported = false;
+        }
+        if (supported) return;
+        window.namaeUnsupported = true;
+        var note = document.getElementById('unsupported-note');
+        if (note) note.hidden = false;
+      })();
+      addEventListener(
+        'error',
+        function (event) {
+          var el = event.target;
+          var failed = el && (el.tagName === 'SCRIPT' || (el.tagName === 'LINK' && el.rel === 'stylesheet'));
+          var note = document.getElementById('boot-note');
+          if (failed && note && !window.namaeUnsupported) note.hidden = false;
+        },
+        true
+      );
+    </script>
+    <noscript>Namae needs JavaScript to run.</noscript>
   </body>
 </html>
